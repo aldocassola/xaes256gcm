@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	nonceSize int = 24
-	keysize   int = 32
-	overhead      = 16
+	NonceSize int = 24
+	Keysize   int = 32
+	Overhead      = 16
 )
 
 type xaesGcm struct {
@@ -23,12 +23,11 @@ func New(key []byte) (cipher.AEAD, error) {
 		return nil, fmt.Errorf("invalid key length")
 	}
 
-	l := make([]byte, aes.BlockSize)
 	c, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	c.Encrypt(l[:aes.BlockSize], l[:aes.BlockSize])
+	l := newL(c)
 
 	res := &xaesGcm{
 		c:  c,
@@ -38,11 +37,11 @@ func New(key []byte) (cipher.AEAD, error) {
 }
 
 func (x *xaesGcm) Overhead() int {
-	return overhead
+	return Overhead
 }
 
 func (x *xaesGcm) NonceSize() int {
-	return nonceSize
+	return NonceSize
 }
 
 func newK1(l []byte) []byte {
@@ -56,12 +55,14 @@ func newK1(l []byte) []byte {
 	return l
 }
 
+func newL(c cipher.Block) []byte {
+	zeros := make([]byte, aes.BlockSize)
+	c.Encrypt(zeros[:], zeros[:])
+	return zeros
+}
+
 func (x *xaesGcm) rekey(nonce []byte) []byte {
-	kx := make([]byte, 0, aes.BlockSize*2)
-	kx = append(kx, byte(0), byte(1), byte(0x58), byte(0))
-	kx = append(kx, nonce[:12]...)
-	kx = append(kx, byte(0), byte(2), byte(0x58), byte(0))
-	kx = append(kx, nonce[:12]...)
+	kx := newMs(nonce)
 	subtle.XORBytes(kx[:aes.BlockSize], kx[:aes.BlockSize], x.k1)
 	subtle.XORBytes(kx[aes.BlockSize:], kx[aes.BlockSize:], x.k1)
 	x.c.Encrypt(kx[:aes.BlockSize], kx[:aes.BlockSize])
@@ -70,8 +71,18 @@ func (x *xaesGcm) rekey(nonce []byte) []byte {
 	return kx
 }
 
+// return M1 and M2 concatenated
+func newMs(nonce []byte) []byte {
+	ms := make([]byte, 0, aes.BlockSize*2)
+	ms = append(ms, byte(0), byte(1), byte(0x58), byte(0))
+	ms = append(ms, nonce[:12]...)
+	ms = append(ms, byte(0), byte(2), byte(0x58), byte(0))
+	ms = append(ms, nonce[:12]...)
+	return ms
+}
+
 func (x *xaesGcm) Seal(dst, nonce, plaintext, additional []byte) []byte {
-	if len(nonce) != nonceSize {
+	if len(nonce) != NonceSize {
 		panic("invalid nonce length")
 	}
 
@@ -83,7 +94,7 @@ func (x *xaesGcm) Seal(dst, nonce, plaintext, additional []byte) []byte {
 }
 
 func (x *xaesGcm) Open(dst, nonce, ciphertext, additional []byte) ([]byte, error) {
-	if len(nonce) != nonceSize {
+	if len(nonce) != NonceSize {
 		return nil, fmt.Errorf("invalide nonce length")
 	}
 
