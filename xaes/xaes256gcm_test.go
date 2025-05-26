@@ -115,7 +115,7 @@ func TestBasic(t *testing.T) {
 			t.Error("N_x mismatch:", tv.N_x)
 		}
 
-		ct := x.Seal([]byte{}, []byte(tv.N), []byte(tv.Plaintext), []byte(tv.AAD))
+		ct := x.Seal(nil, []byte(tv.N), []byte(tv.Plaintext), []byte(tv.AAD))
 		if !bytes.Equal(tv.Ciphertext, ct) {
 			t.Errorf("ciphertext mismatch:%v", ct)
 		}
@@ -148,7 +148,7 @@ func TestCumulative(t *testing.T) {
 	ptBuf := make([]byte, 256)
 	aadBuf := make([]byte, 256)
 	ctBuf := make([]byte, 256+Overhead)
-	// decryptedBuf := make([]byte, 256)
+	decryptedBuf := make([]byte, 256)
 
 	for i := 0; i < iterations; i++ {
 		rand.Read(k)
@@ -161,17 +161,16 @@ func TestCumulative(t *testing.T) {
 		rand.Read(aad)
 
 		x, _ := New(k)
-
 		ct := x.Seal(ctBuf[:0], n, pt, aad)
 		shake.Write(ct)
-		// decrypted, err := x.Open(decryptedBuf[:0], n, ct, aad)
-		// if err != nil {
-		// 	t.Fatal("failed to gcm Open:", err)
-		// }
+		decrypted, err := x.Open(decryptedBuf[:0], n, ct, aad)
+		if err != nil {
+			t.Fatal("failed to gcm Open:", err)
+		}
 
-		// if !bytes.Equal(decrypted, pt) {
-		// 	t.Errorf("decryption mismatch: %v", decrypted)
-		// }
+		if !bytes.Equal(decrypted, pt) {
+			t.Errorf("decryption mismatch: %v", decrypted)
+		}
 
 		if i == 10_000-1 {
 			if hashed := shake.Sum(nil); !bytes.Equal(hashed, Hash10K) {

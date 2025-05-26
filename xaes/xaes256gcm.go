@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	NonceSize int = 24
-	Keysize   int = 32
-	Overhead      = 16
+	NonceSize = 24
+	Keysize   = 32
+	Overhead  = 16
 )
 
 type xaesGcm struct {
@@ -65,16 +65,15 @@ func (x *xaesGcm) rekey(nonce []byte) []byte {
 	subtle.XORBytes(kx[aes.BlockSize:], kx[aes.BlockSize:], x.k1)
 	x.c.Encrypt(kx[:aes.BlockSize], kx[:aes.BlockSize])
 	x.c.Encrypt(kx[aes.BlockSize:], kx[aes.BlockSize:])
-
 	return kx
 }
 
 // return M1 and M2 concatenated
 func newMs(nonce []byte) []byte {
 	ms := make([]byte, 0, aes.BlockSize*2)
-	ms = append(ms, byte(0), byte(1), byte(0x58), byte(0))
+	ms = append(ms, 0, 1, 0x58, 0)
 	ms = append(ms, nonce[:12]...)
-	ms = append(ms, byte(0), byte(2), byte(0x58), byte(0))
+	ms = append(ms, 0, 2, 0x58, 0)
 	ms = append(ms, nonce[:12]...)
 	return ms
 }
@@ -87,7 +86,6 @@ func (x *xaesGcm) Seal(dst, nonce, plaintext, additional []byte) []byte {
 	k, n := x.rekey(nonce), nonce[12:]
 	c, _ := aes.NewCipher(k)
 	gcm, _ := cipher.NewGCM(c)
-
 	return gcm.Seal(dst, n, plaintext, additional)
 }
 
@@ -97,8 +95,15 @@ func (x *xaesGcm) Open(dst, nonce, ciphertext, additional []byte) ([]byte, error
 	}
 
 	k, n := x.rekey(nonce), nonce[12:]
-	c, _ := aes.NewCipher(k)
-	gcm, _ := cipher.NewGCM(c)
+	c, err := aes.NewCipher(k)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(c)
+	if err != nil {
+		return nil, err
+	}
 
 	return gcm.Open(dst, n, ciphertext, additional)
 }
