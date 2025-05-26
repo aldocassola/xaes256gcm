@@ -122,7 +122,7 @@ func TestBasic(t *testing.T) {
 	}
 }
 
-func Test_Cumulative(t *testing.T) {
+func TestCumulative(t *testing.T) {
 	First := unhex("7f9c2ba4e88f827d616045507605853e")
 	Hash10K := unhex("e6b9edf2df6cec60c8cbd864e2211b597fb69a529160cd040d56c0c210081939")
 	Hash1M := unhex("2163ae1445985a30b60585ee67daa55674df06901b890593e824b8a7c885ab15")
@@ -136,30 +136,53 @@ func Test_Cumulative(t *testing.T) {
 	}
 
 	rand.Reset()
-	for i := range 1_000_000 {
-		k := make([]byte, Keysize)
+	iterations := 10_000
+	if !testing.Short() {
+		iterations = 1_000_000
+	}
+
+	k := make([]byte, Keysize)
+	n := make([]byte, NonceSize)
+	ptLenByte := make([]byte, 1)
+	aadLenByte := make([]byte, 1)
+	ptBuf := make([]byte, 256)
+	aadBuf := make([]byte, 256)
+	ctBuf := make([]byte, 256+Overhead)
+	// decryptedBuf := make([]byte, 256)
+
+	for i := 0; i < iterations; i++ {
 		rand.Read(k)
-		n := make([]byte, NonceSize)
 		rand.Read(n)
-		lenbyte := make([]byte, 1)
-		rand.Read(lenbyte)
-		pt := make([]byte, int(lenbyte[0]))
+		rand.Read(ptLenByte)
+		pt := ptBuf[:ptLenByte[0]]
 		rand.Read(pt)
-		rand.Read(lenbyte)
-		aad := make([]byte, int(lenbyte[0]))
+		rand.Read(aadLenByte)
+		aad := aadBuf[:aadLenByte[0]]
 		rand.Read(aad)
 
 		x, _ := New(k)
-		ct := x.Seal(nil, n, pt, aad)
-		shake.Write(ct)
-		hashed := shake.Sum(nil)
 
-		if i == 10_000-1 && !bytes.Equal(hashed, Hash10K) {
-			t.Errorf("10K hash mismatch:%x", hashed)
+		ct := x.Seal(ctBuf[:0], n, pt, aad)
+		shake.Write(ct)
+		// decrypted, err := x.Open(decryptedBuf[:0], n, ct, aad)
+		// if err != nil {
+		// 	t.Fatal("failed to gcm Open:", err)
+		// }
+
+		// if !bytes.Equal(decrypted, pt) {
+		// 	t.Errorf("decryption mismatch: %v", decrypted)
+		// }
+
+		if i == 10_000-1 {
+			if hashed := shake.Sum(nil); !bytes.Equal(hashed, Hash10K) {
+				t.Errorf("10K hash mismatch:%x", hashed)
+			}
 		}
 
-		if !testing.Short() && i == 1_000_000-1 && !bytes.Equal(hashed, Hash1M) {
-			t.Errorf("1M hash mismatch:%x", hashed)
+		if i == 1_000_000-1 {
+			if hashed := shake.Sum(nil); !bytes.Equal(hashed, Hash1M) {
+				t.Errorf("1M hash mismatch:%x", hashed)
+			}
 		}
 	}
 

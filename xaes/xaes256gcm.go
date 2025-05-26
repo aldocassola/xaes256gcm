@@ -27,13 +27,11 @@ func New(key []byte) (cipher.AEAD, error) {
 	if err != nil {
 		return nil, err
 	}
-	l := newL(c)
 
-	res := &xaesGcm{
+	return &xaesGcm{
 		c:  c,
-		k1: newK1(l),
-	}
-	return res, nil
+		k1: newK1(newL(c)),
+	}, nil
 }
 
 func (x *xaesGcm) Overhead() int {
