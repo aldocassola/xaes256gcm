@@ -186,3 +186,23 @@ func TestCumulative(t *testing.T) {
 	}
 
 }
+
+func BenchmarkSingleInstance(b *testing.B) {
+	h := sha3.NewShake128()
+	kbuf := make([]byte, 32)
+	nbuf := make([]byte, 24)
+	databuf := make([]byte, 4096+Overhead)
+	h.Read(kbuf)
+	h.Read(nbuf)
+	h.Read(databuf[:4096])
+
+	x, err := New(kbuf)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	plaintext := databuf[:4096]
+	for b.Loop() {
+		x.Seal(plaintext[:0], nbuf, plaintext, nil)
+	}
+}
